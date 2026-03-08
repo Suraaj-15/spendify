@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { C, GLOBAL_CSS } from "../constants/colors";
 import { Inp, Btn, PasswordInp } from "./ui";
 
-export default function AuthScreen({ onSubmit, loading = false, authError = "", supabaseMissing = false, geminiMissing = false }) {
+export default function AuthScreen({ onSubmit, loading = false, authError = "", supabaseMissing = false, groqMissing = false }) {
   const [mode, setMode] = useState("login");
   const [f, setF] = useState({ name: "", email: "", password: "", confirm: "" });
   const [err, setErr] = useState("");
@@ -39,7 +39,7 @@ export default function AuthScreen({ onSubmit, loading = false, authError = "", 
           <div style={{ width: 42, height: 42, borderRadius: 13, background: `linear-gradient(135deg,${C.accent},${C.accent2})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 20, fontWeight: 800, color: "#04060e", animation: "glow 2s ease infinite" }}>S</div>
           <div>
             <div style={{ fontSize: 19, fontWeight: 800, color: C.text, letterSpacing: "-0.4px" }}>Spendify AI</div>
-            <div style={{ fontSize: 9, color: C.faint, letterSpacing: "2.5px", textTransform: "uppercase" }}>Supabase + Gemini</div>
+            <div style={{ fontSize: 9, color: C.faint, letterSpacing: "2.5px", textTransform: "uppercase" }}>Supabase + Groq</div>
           </div>
         </div>
 
@@ -85,9 +85,9 @@ export default function AuthScreen({ onSubmit, loading = false, authError = "", 
             </div>
           )}
 
-          {geminiMissing && (
+          {groqMissing && (
             <div style={{ fontSize: 12, color: C.danger, background: "#f56c6c14", borderRadius: 8, padding: "9px 13px", border: "1px solid #f56c6c22" }}>
-              Missing `REACT_APP_GEMINI_API_KEY`. Add it in `.env` and restart the app.
+              Missing `REACT_APP_GROQ_API_KEY`. Add it in `.env` and restart the app.
             </div>
           )}
 

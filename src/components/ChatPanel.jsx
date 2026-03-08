@@ -1,17 +1,17 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { C, F } from "../constants/colors";
 import { QUICK_CHIPS } from "../constants/data";
-import { GEMINI_TOOLS } from "../constants/geminiTools";
+import { GROQ_TOOLS } from "../constants/groqTools";
 import { nowM, today } from "../utils/helpers";
 import { execChatTool } from "../services/chatTools";
 import { appendChatMessage, clearChatMessages, getOrCreateChatSession, loadChatContext, loadChatMessages, saveChatContext } from "../services/db";
 import { Spinner } from "./ui";
 
-const GEMINI_MODEL = "gemini-2.5-flash";
-const GEMINI_URL = (key) => `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${key}`;
+const GROQ_MODEL = "llama-3.3-70b-versatile";
+const GROQ_URL = "https://api.groq.com/openai/v1/chat/completions";
 
-function toContent(msgs) {
-  return msgs.map((m) => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.text }] }));
+function toMessages(msgs) {
+  return msgs.map((m) => ({ role: m.role === "assistant" ? "assistant" : "user", content: m.text }));
 }
 
 function errMessage(err, fallback = "Unknown error") {
@@ -25,14 +25,64 @@ function errMessage(err, fallback = "Unknown error") {
   }
 }
 
-function parseGeminiLimitInfo(text = "") {
+function parseGroqLimitInfo(text = "") {
   const lower = String(text).toLowerCase();
-  const isQuotaError = lower.includes("quota exceeded") || lower.includes("resource_exhausted") || lower.includes("rate limit") || lower.includes("too many requests");
+  const isQuotaError =
+    lower.includes("quota exceeded") ||
+    lower.includes("resource_exhausted") ||
+    lower.includes("rate limit") ||
+    lower.includes("rate_limit_exceeded") ||
+    lower.includes("too many requests");
+
   if (!isQuotaError) return { isQuotaError: false, retrySeconds: null };
 
-  const retryMatch = String(text).match(/retry in\s+([\d.]+)s/i);
-  const retrySeconds = retryMatch ? Math.max(1, Math.ceil(Number(retryMatch[1]) || 0)) : null;
+  const retryMatch = String(text).match(/retry (?:in|after)\s+([\d.]+)\s*(ms|s|sec|seconds)?/i);
+  if (!retryMatch) return { isQuotaError: true, retrySeconds: null };
+
+  const rawDelay = Number(retryMatch[1]) || 0;
+  const unit = String(retryMatch[2] || "s").toLowerCase();
+  const retrySeconds = unit === "ms" ? Math.max(1, Math.ceil(rawDelay / 1000)) : Math.max(1, Math.ceil(rawDelay));
   return { isQuotaError: true, retrySeconds };
+}
+
+function parseToolArgs(rawArgs) {
+  if (!rawArgs) return {};
+  if (typeof rawArgs === "object") return rawArgs;
+  if (typeof rawArgs !== "string") return {};
+
+  try {
+    return JSON.parse(rawArgs);
+  } catch (_err) {
+    return {};
+  }
+}
+
+async function callGroq(apiKey, payload) {
+  const response = await fetch(GROQ_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(payload),
+  });
+
+  let data = null;
+  const contentType = response.headers.get("content-type") || "";
+  if (contentType.includes("application/json")) {
+    data = await response.json();
+  } else {
+    const text = await response.text();
+    data = { error: { message: text || `Groq request failed with status ${response.status}.` } };
+  }
+
+  if (!response.ok || data?.error) {
+    const apiError = new Error(errMessage(data?.error, `Groq request failed with status ${response.status}.`));
+    apiError.status = data?.error?.status || response.status;
+    throw apiError;
+  }
+
+  return data;
 }
 
 export default function ChatPanel({ apiKey, userId, expenses, budgets, categories, baseCurrency, onRefreshData }) {
@@ -77,11 +127,11 @@ export default function ChatPanel({ apiKey, userId, expenses, budgets, categorie
 
         if (!dbMsgs.length) {
           setMsgs([greeting]);
-          setHistory(toContent([greeting]));
+          setHistory(toMessages([greeting]));
           await appendChatMessage(session.id, "assistant", greeting.text);
         } else {
           setMsgs(dbMsgs);
-          setHistory(toContent(dbMsgs));
+          setHistory(toMessages(dbMsgs));
         }
       } catch (err) {
         if (ignore) return;
@@ -136,7 +186,7 @@ Recent budget sample: ${JSON.stringify(budgets.slice(0, 20))}.`;
       if (!text?.trim() || loading || !sessionId) return;
       if (quotaBlockedUntil && Date.now() < quotaBlockedUntil) {
         const waitSeconds = Math.max(1, Math.ceil((quotaBlockedUntil - Date.now()) / 1000));
-        const waitMsg = `Gemini request limit is active for this key. Please retry in ${waitSeconds}s.`;
+        const waitMsg = `Groq request limit is active for this key. Please retry in ${waitSeconds}s.`;
         setMsgs((m) => [...m, { role: "assistant", text: waitMsg }]);
         await persistMessage("assistant", waitMsg);
         return;
@@ -149,101 +199,92 @@ Recent budget sample: ${JSON.stringify(budgets.slice(0, 20))}.`;
       setLoading(true);
 
       if (!apiKey) {
-        const msg = "Gemini API key missing. Set REACT_APP_GEMINI_API_KEY in your .env file and restart the app.";
+        const msg = "Groq API key missing. Set REACT_APP_GROQ_API_KEY in your .env file and restart the app.";
         setMsgs((m) => [...m, { role: "assistant", text: msg }]);
         await persistMessage("assistant", msg);
         setLoading(false);
         return;
       }
 
-      const newHistory = [...history, { role: "user", parts: [{ text: userText }] }];
+      const newHistory = [...history, { role: "user", content: userText }];
+      const systemMessage = { role: "system", content: buildSystemPrompt() };
 
       try {
-        const r1 = await fetch(GEMINI_URL(apiKey), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            system_instruction: { parts: [{ text: buildSystemPrompt() }] },
-            contents: newHistory,
-            tools: GEMINI_TOOLS,
-            generationConfig: { temperature: 0.2, maxOutputTokens: 1200 },
-          }),
+        const d1 = await callGroq(apiKey, {
+          model: GROQ_MODEL,
+          messages: [systemMessage, ...newHistory],
+          tools: GROQ_TOOLS,
+          tool_choice: "auto",
+          temperature: 0.2,
+          max_tokens: 1200,
         });
 
-        const d1 = await r1.json();
-        if (d1.error) {
-          const apiError = new Error(errMessage(d1.error, "Gemini request failed."));
-          apiError.status = d1.error.status;
-          throw apiError;
-        }
-
-        let cand = d1.candidates?.[0];
-        let parts = cand?.content?.parts || [];
-        const fnCalls = parts.filter((p) => p.functionCall);
+        let assistantMsg = d1.choices?.[0]?.message || {};
+        const toolCalls = Array.isArray(assistantMsg.tool_calls) ? assistantMsg.tool_calls : [];
 
         const mutating = new Set(["add_expense", "update_expense", "delete_expense", "confirm_action"]);
         let hasMutation = false;
 
-        if (fnCalls.length > 0) {
-          const fnResults = [];
+        if (toolCalls.length > 0) {
+          const toolMessages = [];
 
-          for (const p of fnCalls) {
+          for (const call of toolCalls) {
+            const toolName = call?.function?.name;
+            const toolArgs = parseToolArgs(call?.function?.arguments);
+
             const { result, nextContext } = await execChatTool({
-              name: p.functionCall.name,
-              args: p.functionCall.args,
+              name: toolName,
+              args: toolArgs,
               userId,
               sessionId,
               context: contextRef.current,
               categories,
               baseCurrency,
             });
+
             contextRef.current = nextContext;
-            fnResults.push({ name: p.functionCall.name, response: { result } });
-            if (mutating.has(p.functionCall.name)) hasMutation = true;
+            if (mutating.has(toolName)) hasMutation = true;
+
+            toolMessages.push({
+              role: "tool",
+              tool_call_id: call.id,
+              content: JSON.stringify(result || {}),
+            });
           }
 
-          const r2 = await fetch(GEMINI_URL(apiKey), {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              system_instruction: { parts: [{ text: buildSystemPrompt() }] },
-              contents: [
-                ...newHistory,
-                { role: "model", parts: fnCalls.map((p) => ({ functionCall: p.functionCall })) },
-                { role: "user", parts: fnResults.map((r) => ({ functionResponse: r })) },
-              ],
-              generationConfig: { temperature: 0.2, maxOutputTokens: 900 },
-            }),
+          const d2 = await callGroq(apiKey, {
+            model: GROQ_MODEL,
+            messages: [
+              systemMessage,
+              ...newHistory,
+              { role: "assistant", content: assistantMsg.content || "", tool_calls: toolCalls },
+              ...toolMessages,
+            ],
+            temperature: 0.2,
+            max_tokens: 900,
           });
 
-          const d2 = await r2.json();
-          if (d2.error) {
-            const apiError = new Error(errMessage(d2.error, "Gemini request failed."));
-            apiError.status = d2.error.status;
-            throw apiError;
-          }
-          cand = d2.candidates?.[0];
-          parts = cand?.content?.parts || [];
+          assistantMsg = d2.choices?.[0]?.message || {};
         }
 
-        const reply = parts.find((p) => p.text)?.text || "Done.";
+        const reply = String(assistantMsg.content || "").trim() || "Done.";
         setMsgs((m) => [...m, { role: "assistant", text: reply }]);
         await persistMessage("assistant", reply);
 
-        setHistory([...newHistory, { role: "model", parts: [{ text: reply }] }]);
+        setHistory([...newHistory, { role: "assistant", content: reply }]);
 
         if (hasMutation) {
           await onRefreshData?.();
         }
       } catch (err) {
         const rawError = errMessage(err);
-        const limitInfo = parseGeminiLimitInfo(rawError);
+        const limitInfo = parseGroqLimitInfo(rawError);
         let msg = `Error: ${rawError}`;
 
         if (limitInfo.isQuotaError) {
           const retrySeconds = limitInfo.retrySeconds || 30;
           setQuotaBlockedUntil(Date.now() + retrySeconds * 1000);
-          msg = `Gemini request limit is active for this key. Please retry in ${retrySeconds}s.`;
+          msg = `Groq request limit is active for this key. Please retry in ${retrySeconds}s.`;
         }
 
         setMsgs((m) => [...m, { role: "assistant", text: msg }]);
@@ -290,7 +331,7 @@ Recent budget sample: ${JSON.stringify(budgets.slice(0, 20))}.`;
       };
 
       setMsgs([greeting]);
-      setHistory(toContent([greeting]));
+      setHistory(toMessages([greeting]));
       await appendChatMessage(sessionId, "assistant", greeting.text);
     } catch (err) {
       const msg = `Failed to clear chat: ${errMessage(err)}`;
@@ -409,5 +450,3 @@ Recent budget sample: ${JSON.stringify(budgets.slice(0, 20))}.`;
     </div>
   );
 }
-
-

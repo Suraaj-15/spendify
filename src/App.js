@@ -56,7 +56,7 @@ export default function App() {
   const [showAdd, setShowAdd] = useState(false);
   const [editExp, setEditExp] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
-  const apiKey = (process.env.REACT_APP_GEMINI_API_KEY || "").trim();
+  const apiKey = (process.env.REACT_APP_GROQ_API_KEY || "").trim();
   const baseCurrency = profile?.base_currency || "INR";
   const activeTheme = profile?.theme || "dark";
 
@@ -336,7 +336,7 @@ export default function App() {
   }
 
   if (!session) {
-    return <AuthScreen onSubmit={handleAuthSubmit} loading={authBusy} authError={authError} supabaseMissing={!hasSupabaseEnv} geminiMissing={!apiKey} />;
+    return <AuthScreen onSubmit={handleAuthSubmit} loading={authBusy} authError={authError} supabaseMissing={!hasSupabaseEnv} groqMissing={!apiKey} />;
   }
 
   return (

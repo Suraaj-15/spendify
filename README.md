@@ -8,7 +8,7 @@ AI-powered expense tracker with conversational CRUD, analytics, budgeting, recur
 
 - Email/password authentication with Supabase Auth
 - Persistent expenses/categories/budgets in Supabase Postgres
-- AI chatbot (Gemini function-calling) for create/read/update/delete/query
+- AI chatbot (Groq function-calling) for create/read/update/delete/query
 - Context-aware chat memory (last expense, last query, pending confirmations)
 - Safe bulk delete confirmation flow in chat
 - Dashboard + analytics charts (category mix, trends, budget health, merchants)
@@ -22,7 +22,8 @@ AI-powered expense tracker with conversational CRUD, analytics, budgeting, recur
 
 - Frontend: React (Create React App)
 - Data/Auth: Supabase (Postgres + Auth + RLS)
-- AI: Gemini API (environment variable key)
+- AI: Groq API (environment variable key)
+- Model: `llama-3.3-70b-versatile`
 - Charts: Recharts
 - Testing: Jest + React Testing Library
 
@@ -36,7 +37,7 @@ AI-powered expense tracker with conversational CRUD, analytics, budgeting, recur
    ```env
    REACT_APP_SUPABASE_URL=your_supabase_project_url
    REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
-   REACT_APP_GEMINI_API_KEY=your_gemini_api_key
+   REACT_APP_GROQ_API_KEY=your_groq_api_key
    ```
 3. Apply DB schema in Supabase SQL editor:
    - Run [`supabase/schema.sql`](./supabase/schema.sql)
@@ -51,14 +52,14 @@ AI-powered expense tracker with conversational CRUD, analytics, budgeting, recur
 
 - `REACT_APP_SUPABASE_URL`: Supabase project URL
 - `REACT_APP_SUPABASE_ANON_KEY`: Supabase anon key
-- `REACT_APP_GEMINI_API_KEY`: Gemini API key for chat requests
+- `REACT_APP_GROQ_API_KEY`: Groq API key for chat requests
 
 ## Architecture and Design
 
 - UI layer: page components for dashboard, transactions, categories, budgets, analytics, chat
 - Data layer: Supabase-backed services in `src/services/db.js` and `src/services/fx.js`
 - AI layer:
-  - Tool declarations in `src/constants/geminiTools.js`
+  - Tool declarations in `src/constants/groqTools.js`
   - Tool execution in `src/services/chatTools.js` (DB-backed)
   - Chat UI + function-calling orchestration in `src/components/ChatPanel.jsx`
 - Business logic:
@@ -67,7 +68,7 @@ AI-powered expense tracker with conversational CRUD, analytics, budgeting, recur
 
 ## AI Integration (CRUD + State)
 
-Chatbot uses Gemini function calling with tools:
+Chatbot uses Groq function calling with tools (`llama-3.3-70b-versatile`):
 
 - `add_expense`
 - `query_expenses`
@@ -80,9 +81,9 @@ Chatbot uses Gemini function calling with tools:
 
 Execution flow:
 
-1. User message -> Gemini tool call(s)
+1. User message -> Groq tool call(s)
 2. Tool calls executed against Supabase tables (real DB operations)
-3. Tool response sent back to Gemini
+3. Tool response sent back to Groq
 4. Final natural-language response rendered
 
 Context state is persisted in `chat_context`:
@@ -101,7 +102,7 @@ Bulk deletes require explicit confirmation via `confirm_action`.
 3. Add env vars in Vercel Project Settings:
    - `REACT_APP_SUPABASE_URL`
    - `REACT_APP_SUPABASE_ANON_KEY`
-   - `REACT_APP_GEMINI_API_KEY`
+   - `REACT_APP_GROQ_API_KEY`
 4. Deploy
 5. Run Supabase schema migration (`supabase/schema.sql`) in production project
 6. Copy Vercel URL to README Live Demo field
@@ -151,7 +152,7 @@ Included tests:
 
 - OCR receipt scanning (deferred in this scope)
 - Better recurring suggestions with ML confidence model
-- Server-side Gemini proxy with observability and rate limiting
+- Server-side Groq proxy with observability and rate limiting
 - Role-based sharing/family workspace mode
 - Alert notifications for budget overrun thresholds
 
