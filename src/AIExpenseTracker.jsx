@@ -1020,7 +1020,7 @@ Always call a function tool. Smart auto-categorize. Respond concisely with emoji
 
     const newH = [...history,{role:"user",parts:[{text}]}];
     try {
-      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+      const r = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
         {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
           system_instruction:{parts:[{text:sys}]},contents:newH,tools:GEMINI_TOOLS,
           generationConfig:{temperature:0.3,maxOutputTokens:1024}})});
@@ -1037,7 +1037,7 @@ Always call a function tool. Smart auto-categorize. Respond concisely with emoji
           if (sc.updateExpense) setExpenses(prev=>prev.map(e=>e.id===sc.updateExpense.id?sc.updateExpense:e));
           if (sc.deleteIds) setExpenses(prev=>prev.filter(e=>!sc.deleteIds.includes(e.id)));
         });
-        const r2=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`,
+        const r2=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
           {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({
             system_instruction:{parts:[{text:sys}]},
             contents:[...newH,{role:"model",parts:fnCalls.map(p=>({functionCall:p.functionCall}))},{role:"user",parts:fnResults.map(r=>({functionResponse:r}))}],
@@ -1060,7 +1060,7 @@ Always call a function tool. Smart auto-categorize. Respond concisely with emoji
         <div style={{width:9,height:9,borderRadius:"50%",background:C.accent,boxShadow:`0 0 10px ${C.accent}`,animation:"glow 2s ease infinite",flexShrink:0}}/>
         <div style={{flex:1}}>
           <div style={{fontSize:13,fontWeight:700,color:C.text}}>Gemini AI Assistant</div>
-          <div style={{fontSize:10,color:C.faint}}>Natural language CRUD · gemini-2.0-flash</div>
+          <div style={{fontSize:10,color:C.faint}}>Natural language CRUD · gemini-2.5-flash</div>
         </div>
         <button onClick={()=>setHistory([])} style={{background:"none",border:"none",color:C.faint,cursor:"pointer",fontSize:11,fontFamily:F}} title="Clear history">↺</button>
       </div>

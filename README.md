@@ -1,70 +1,157 @@
-# Getting Started with Create React App
+# Spendify AI Expense Tracker
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Live Demo: **ADD_YOUR_VERCEL_URL_HERE**
 
-## Available Scripts
+AI-powered expense tracker with conversational CRUD, analytics, budgeting, recurring detection, multi-currency support, voice input, and Supabase persistence.
 
-In the project directory, you can run:
+## Features
 
-### `npm start`
+- Email/password authentication with Supabase Auth
+- Persistent expenses/categories/budgets in Supabase Postgres
+- AI chatbot (Gemini function-calling) for create/read/update/delete/query
+- Context-aware chat memory (last expense, last query, pending confirmations)
+- Safe bulk delete confirmation flow in chat
+- Dashboard + analytics charts (category mix, trends, budget health, merchants)
+- Advanced transactions filtering/sorting/search + CSV/PDF export
+- Recurring expense detection + recurring rules management
+- Multi-currency expense entry with base-currency analytics conversion
+- Theme toggle (light/dark) stored in user profile
+- Voice input in chat via Web Speech API
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+## Tech Stack
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+- Frontend: React (Create React App)
+- Data/Auth: Supabase (Postgres + Auth + RLS)
+- AI: Gemini API (environment variable key)
+- Charts: Recharts
+- Testing: Jest + React Testing Library
 
-### `npm test`
+## Setup Instructions
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+2. Create `.env` in project root:
+   ```env
+   REACT_APP_SUPABASE_URL=your_supabase_project_url
+   REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
+   REACT_APP_GEMINI_API_KEY=your_gemini_api_key
+   ```
+3. Apply DB schema in Supabase SQL editor:
+   - Run [`supabase/schema.sql`](./supabase/schema.sql)
+4. Start app:
+   ```bash
+   npm start
+   ```
+5. Open `http://localhost:3000`
+6. Sign up/sign in and start using chat (key is loaded from environment variable).
 
-### `npm run build`
+## Environment Variables
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+- `REACT_APP_SUPABASE_URL`: Supabase project URL
+- `REACT_APP_SUPABASE_ANON_KEY`: Supabase anon key
+- `REACT_APP_GEMINI_API_KEY`: Gemini API key for chat requests
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+## Architecture and Design
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+- UI layer: page components for dashboard, transactions, categories, budgets, analytics, chat
+- Data layer: Supabase-backed services in `src/services/db.js` and `src/services/fx.js`
+- AI layer:
+  - Tool declarations in `src/constants/geminiTools.js`
+  - Tool execution in `src/services/chatTools.js` (DB-backed)
+  - Chat UI + function-calling orchestration in `src/components/ChatPanel.jsx`
+- Business logic:
+  - Recurring detection in `src/utils/recurring.js`
+  - Chat safety/context helpers in `src/utils/chatGuard.js`
 
-### `npm run eject`
+## AI Integration (CRUD + State)
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Chatbot uses Gemini function calling with tools:
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+- `add_expense`
+- `query_expenses`
+- `update_expense`
+- `delete_expense`
+- `confirm_action`
+- `compare_spending`
+- `get_budget_status`
+- `get_insights`
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+Execution flow:
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+1. User message -> Gemini tool call(s)
+2. Tool calls executed against Supabase tables (real DB operations)
+3. Tool response sent back to Gemini
+4. Final natural-language response rendered
 
-## Learn More
+Context state is persisted in `chat_context`:
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+- `last_expense_id`
+- `last_query_signature`
+- `last_result_set_ids`
+- `pending_confirmation_action`
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+Bulk deletes require explicit confirmation via `confirm_action`.
 
-### Code Splitting
+## Deployment Instructions (Vercel)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+1. Push repo to GitHub
+2. Import repo in Vercel
+3. Add env vars in Vercel Project Settings:
+   - `REACT_APP_SUPABASE_URL`
+   - `REACT_APP_SUPABASE_ANON_KEY`
+   - `REACT_APP_GEMINI_API_KEY`
+4. Deploy
+5. Run Supabase schema migration (`supabase/schema.sql`) in production project
+6. Copy Vercel URL to README Live Demo field
 
-### Analyzing the Bundle Size
+## Database and Security
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+- All data tables are user-scoped via `user_id`
+- Row Level Security enabled on all application tables
+- Policies ensure users can only read/write their own rows
+- Chat messages/context are constrained via chat session ownership policies
 
-### Making a Progressive Web App
+## Tests
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Run tests:
 
-### Advanced Configuration
+```bash
+npm test -- --watchAll=false
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+Included tests:
 
-### Deployment
+- recurring detection logic (`src/utils/recurring.test.js`)
+- chat guard/context resolution (`src/utils/chatGuard.test.js`)
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+## Demo Assets
 
-### `npm run build` fails to minify
+- Add screenshots/GIF/video in this section before submission
+- Include sample chat flows:
+  - Add expense by natural language
+  - Query monthly spend
+  - Update latest expense
+  - Bulk delete + confirmation
+  - Budget tracking insights
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+## Submission Checklist
+
+- [ ] Private GitHub repository created
+- [ ] Collaborators added:
+  - `Aswath363`
+  - `akshaiP`
+  - `ashwanthnebula`
+- [ ] Live demo deployed and URL added to README
+- [ ] README fully filled (this file)
+- [ ] Submission email sent with repo + demo links
+
+## Future Improvements
+
+- OCR receipt scanning (deferred in this scope)
+- Better recurring suggestions with ML confidence model
+- Server-side Gemini proxy with observability and rate limiting
+- Role-based sharing/family workspace mode
+- Alert notifications for budget overrun thresholds
+
