@@ -57,6 +57,8 @@ export default function App() {
   const [editExp, setEditExp] = useState(null);
   const [showProfile, setShowProfile] = useState(false);
   const apiKey = (process.env.REACT_APP_GEMINI_API_KEY || "").trim();
+  const baseCurrency = profile?.base_currency || "INR";
+  const activeTheme = profile?.theme || "dark";
 
   const userId = session?.user?.id;
 
@@ -71,7 +73,7 @@ export default function App() {
       setBudgets(data.budgets);
       themeToDom(data.profile?.theme || "dark");
     } catch (err) {
-      setAuthError(err.message || "Failed loading application data.");
+      setAuthError(errMessage(err, "Failed loading application data."));
     } finally {
       setLoadingData(false);
     }
@@ -177,12 +179,12 @@ export default function App() {
   };
 
   const addExpenseHandler = async (e) => {
-    const row = await addExpense(userId, e, profile.base_currency);
+    const row = await addExpense(userId, e, baseCurrency);
     setExpenses((p) => [row, ...p]);
   };
 
   const saveEdit = async (e) => {
-    const updated = await updateExpense(userId, editExp.id, e, profile.base_currency);
+    const updated = await updateExpense(userId, editExp.id, e, baseCurrency);
     setExpenses((p) => p.map((x) => (x.id === editExp.id ? updated : x)));
   };
 
@@ -348,9 +350,9 @@ export default function App() {
           page={page}
           expenseCount={expenses.length}
           onAddExpense={() => setShowAdd(true)}
-          theme={profile?.theme || "dark"}
+          theme={activeTheme}
           onToggleTheme={toggleTheme}
-          baseCurrency={profile?.base_currency || "INR"}
+          baseCurrency={baseCurrency}
           onBaseCurrencyChange={changeBaseCurrency}
         />
 
@@ -359,7 +361,7 @@ export default function App() {
             {loadingData && <div style={{ color: C.faint, marginBottom: 10 }}>Refreshing data...</div>}
 
             {page === "dashboard" && (
-              <Dashboard expenses={expenses} budgets={budgets} categories={categories} setPage={setPage} baseCurrency={profile?.base_currency || "INR"} />
+              <Dashboard expenses={expenses} budgets={budgets} categories={categories} setPage={setPage} baseCurrency={baseCurrency} />
             )}
 
             {page === "transactions" && (
@@ -369,7 +371,7 @@ export default function App() {
                 onDelete={delExpense}
                 onEdit={(e) => setEditExp(e)}
                 onAddNew={() => setShowAdd(true)}
-                baseCurrency={profile?.base_currency || "INR"}
+                baseCurrency={baseCurrency}
               />
             )}
 
@@ -377,7 +379,7 @@ export default function App() {
               <Categories
                 categories={categories}
                 expenses={expenses}
-                baseCurrency={profile?.base_currency || "INR"}
+                baseCurrency={baseCurrency}
                 onAddCategory={addCategoryHandler}
                 onRemoveCategory={removeCategoryHandler}
                 onUpdateCategory={updateCategoryHandler}
@@ -389,14 +391,14 @@ export default function App() {
                 budgets={budgets}
                 expenses={expenses}
                 categories={categories}
-                baseCurrency={profile?.base_currency || "INR"}
+                baseCurrency={baseCurrency}
                 onAddBudget={addBudgetHandler}
                 onUpdateBudget={updateBudgetHandler}
                 onDeleteBudget={deleteBudgetHandler}
               />
             )}
 
-            {page === "analytics" && <Analytics expenses={expenses} categories={categories} budgets={budgets} baseCurrency={profile?.base_currency || "INR"} />}
+            {page === "analytics" && <Analytics expenses={expenses} categories={categories} budgets={budgets} baseCurrency={baseCurrency} />}
           </div>
 
           <ChatPanel
@@ -405,20 +407,20 @@ export default function App() {
             expenses={expenses}
             budgets={budgets}
             categories={categories}
-            baseCurrency={profile?.base_currency || "INR"}
+            baseCurrency={baseCurrency}
             onRefreshData={loadData}
           />
         </div>
       </div>
 
       {showAdd && (
-        <ExpenseModal categories={categories} baseCurrency={profile?.base_currency || "INR"} onSave={addExpenseHandler} onClose={() => setShowAdd(false)} />
+        <ExpenseModal categories={categories} baseCurrency={baseCurrency} onSave={addExpenseHandler} onClose={() => setShowAdd(false)} />
       )}
 
       {editExp && (
         <ExpenseModal
           categories={categories}
-          baseCurrency={profile?.base_currency || "INR"}
+          baseCurrency={baseCurrency}
           initial={editExp}
           onSave={async (e) => {
             await saveEdit(e);

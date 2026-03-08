@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { C, F } from "../../constants/colors";
 import { fmtMoney, nowM, getCat, categoryMark } from "../../utils/helpers";
 import { Btn, Card, Inp, Sel } from "../ui";
@@ -22,6 +22,13 @@ export default function Budgets({
 
   const monthBudgets = budgets.filter((b) => b.month === m);
   const availCats = categories.filter((c) => !monthBudgets.find((b) => b.category === c.id));
+
+  useEffect(() => {
+    if (!availCats.length) return;
+    if (!availCats.some((c) => c.id === newCat)) {
+      setNewCat(availCats[0].id);
+    }
+  }, [availCats, newCat]);
 
   return (
     <div>
@@ -72,7 +79,9 @@ export default function Budgets({
                   <Inp type="number" value={editVal} onChange={(e) => setEditVal(e.target.value)} style={{ fontSize: 13 }} />
                   <Btn
                     onClick={async () => {
-                      await onUpdateBudget({ ...b, limit: Number(editVal) });
+                      const nextLimit = Number(editVal);
+                      if (!Number.isFinite(nextLimit) || nextLimit <= 0) return;
+                      await onUpdateBudget({ ...b, limit: nextLimit });
                       setEditId(null);
                     }}
                     style={{ padding: "8px 12px" }}
@@ -131,8 +140,9 @@ export default function Budgets({
             <Inp type="number" placeholder="Monthly limit" value={newLim} onChange={(e) => setNewLim(e.target.value)} />
             <Btn
               onClick={async () => {
-                if (!newLim) return;
-                await onAddBudget({ category: newCat, limit: Number(newLim), month: m });
+                const nextLimit = Number(newLim);
+                if (!newCat || !Number.isFinite(nextLimit) || nextLimit <= 0) return;
+                await onAddBudget({ category: newCat, limit: nextLimit, month: m });
                 setNewLim("");
               }}
               style={{ width: "100%", justifyContent: "center" }}

@@ -27,23 +27,12 @@ function errMessage(err, fallback = "Unknown error") {
 
 function parseGeminiLimitInfo(text = "") {
   const lower = String(text).toLowerCase();
-  const isQuotaError =
-    lower.includes("quota exceeded") ||
-    lower.includes("resource_exhausted") ||
-    lower.includes("rate limit") ||
-    lower.includes("too many requests");
-
-  if (!isQuotaError) {
-    return { isQuotaError: false, retrySeconds: null, freeTierLimitZero: false };
-  }
+  const isQuotaError = lower.includes("quota exceeded") || lower.includes("resource_exhausted") || lower.includes("rate limit") || lower.includes("too many requests");
+  if (!isQuotaError) return { isQuotaError: false, retrySeconds: null };
 
   const retryMatch = String(text).match(/retry in\s+([\d.]+)s/i);
   const retrySeconds = retryMatch ? Math.max(1, Math.ceil(Number(retryMatch[1]) || 0)) : null;
-  const freeTierLimitZero =
-    lower.includes("free_tier") &&
-    lower.includes("limit: 0");
-
-  return { isQuotaError: true, retrySeconds, freeTierLimitZero };
+  return { isQuotaError: true, retrySeconds };
 }
 
 export default function ChatPanel({ apiKey, userId, expenses, budgets, categories, baseCurrency, onRefreshData }) {
