@@ -96,33 +96,6 @@ create table if not exists public.merchant_category_rules (
   constraint merchant_rule_category_fk foreign key (user_id, category_id) references public.categories(user_id, id) on update cascade
 );
 
-create table if not exists public.recurring_rules (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  merchant_pattern text not null,
-  category_id text not null,
-  cadence text not null check (cadence in ('weekly', 'monthly')),
-  amount_tolerance numeric(12,2) not null,
-  average_amount numeric(12,2) not null,
-  currency text not null default 'INR',
-  next_due_date date,
-  last_seen date,
-  is_active boolean not null default true,
-  created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now(),
-  constraint recurring_category_fk foreign key (user_id, category_id) references public.categories(user_id, id) on update cascade
-);
-
-create table if not exists public.recurring_events (
-  id uuid primary key default gen_random_uuid(),
-  user_id uuid not null references auth.users(id) on delete cascade,
-  rule_id uuid not null references public.recurring_rules(id) on delete cascade,
-  expense_id bigint references public.expenses(id) on delete set null,
-  generated_on date not null default current_date,
-  status text not null default 'suggested' check (status in ('suggested', 'accepted', 'ignored')),
-  created_at timestamptz not null default now()
-);
-
 create table if not exists public.fx_rates_cache (
   base_currency text not null,
   rate_date date not null,
@@ -139,8 +112,6 @@ alter table public.chat_sessions enable row level security;
 alter table public.chat_messages enable row level security;
 alter table public.chat_context enable row level security;
 alter table public.merchant_category_rules enable row level security;
-alter table public.recurring_rules enable row level security;
-alter table public.recurring_events enable row level security;
 alter table public.fx_rates_cache enable row level security;
 
 drop policy if exists profiles_owner on public.profiles;
@@ -149,8 +120,6 @@ drop policy if exists expenses_owner on public.expenses;
 drop policy if exists budgets_owner on public.budgets;
 drop policy if exists sessions_owner on public.chat_sessions;
 drop policy if exists merchant_rules_owner on public.merchant_category_rules;
-drop policy if exists recurring_rules_owner on public.recurring_rules;
-drop policy if exists recurring_events_owner on public.recurring_events;
 drop policy if exists fx_cache_read_all on public.fx_rates_cache;
 drop policy if exists fx_cache_write_owner on public.fx_rates_cache;
 drop policy if exists fx_cache_update_owner on public.fx_rates_cache;
@@ -163,8 +132,6 @@ create policy expenses_owner on public.expenses for all using (auth.uid() = user
 create policy budgets_owner on public.budgets for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy sessions_owner on public.chat_sessions for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy merchant_rules_owner on public.merchant_category_rules for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy recurring_rules_owner on public.recurring_rules for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-create policy recurring_events_owner on public.recurring_events for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create policy fx_cache_read_all on public.fx_rates_cache for select using (true);
 create policy fx_cache_write_owner on public.fx_rates_cache for insert with check (auth.uid() is not null);
 create policy fx_cache_update_owner on public.fx_rates_cache for update using (auth.uid() is not null) with check (auth.uid() is not null);
